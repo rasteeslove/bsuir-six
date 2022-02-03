@@ -7,7 +7,7 @@
 Cypher docu:
 
 A CLI tool. It accepts 5+2n arguments (n >= 0, integer):
-	1) 0 | 1 | 2| 3, which corresponds to:
+	1) 0 | 1 | 2 | 3, which corresponds to:
 		0 => Caesar Encrypt,
 		1 => Caesar Decrypt,
 		2 => Vigenere Encrypt,
@@ -20,8 +20,8 @@ A CLI tool. It accepts 5+2n arguments (n >= 0, integer):
 Behavior on out-of-range chars: ignore.
 
 In case of Caesar: multiple bounds | key&bounds, e.g.:
-	"cy 0 s.txt t.txt 13 az AZ" | "cy 0 s.txt t.txt 13 az 13 AZ",
-	"cy 1 e.txt d.txt 7 az AZ" | "cy 1 e.txt d.txt 7 az 7 AZ",
+	"cy 0 s.txt t.txt 13 az" | "cy 0 s.txt t.txt 13 az 13 AZ",
+	"cy 1 e.txt d.txt 7 az" | "cy 1 e.txt d.txt 7 az 7 AZ",
 In case of Vigenere: multiple key&bounds pairs, e.g.:
 	"cy 2 s.txt t.txt secretkey az SECRETKEY AZ";
 	(the "i" char counter in the second for loop of the translate_file function
@@ -44,7 +44,9 @@ void translate_file(std::string source_path, std::string target_path, int mode) 
 
 	std::vector<int> alphabet_sizes;
 	for (int i = 0; i < keybounds.size(); i++)
-		alphabet_sizes.push_back(keybounds[i].second[1] - keybounds[i].second[0] + 1);
+		alphabet_sizes.push_back(keybounds[i].second[1]
+		                         - keybounds[i].second[0]
+								 + 1);
 
 	char c;
 	int sign = (mode == 0 || mode == 2 ? 1 : -1);
@@ -56,8 +58,13 @@ void translate_file(std::string source_path, std::string target_path, int mode) 
 			std::string bounds = keybounds[j].second;
 			if (cc >= bounds[0] && cc <= bounds[1]) {
 				std::string key = keybounds[j].first;
-				int shift = (mode == 0 || mode == 1 ? std::stoi(key) : int(key[i % key.length()] - bounds[0]));
-				cc = bounds[0] + (alphabet_sizes[j] + cc - bounds[0] + sign * shift) % alphabet_sizes[j];
+				int shift = (mode == 0 || mode == 1
+				             ? std::stoi(key)
+							 : int(key[i % key.length()] - bounds[0]));
+				cc = bounds[0] + (alphabet_sizes[j]
+				                  + cc
+								  - bounds[0]
+								  + sign*shift) % alphabet_sizes[j];
 				i++;
 				break;
 			}
