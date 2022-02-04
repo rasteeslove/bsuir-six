@@ -6,4 +6,5 @@ import mydes
 # mydes.decryptB('b.demo', 'c.demo', 'key0.demo')
 
 # testing the 'PyCryptodome' library
-# ...
+# mydes.encryptA('a.demo', 'd.demo', 'key0.demo')
+# mydes.decryptA('d.demo', 'e.demo', 'key0.demo')
