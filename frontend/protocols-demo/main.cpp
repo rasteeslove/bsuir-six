@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	std::string username(argv[0]);
+	std::string username(argv[1]);
 
 	// logging in?
 	// adding username to file ?
