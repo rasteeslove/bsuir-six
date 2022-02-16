@@ -83,6 +83,8 @@ void text(std::string me, std::string they) {
 	std::string message;
 	std::getline(std::cin, message);
 
+	message = me + ":" + message + "\n"; // maybe add time
+
 	// making udp connection:
 	int udp_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (udp_sock_fd < 0) {
@@ -126,14 +128,14 @@ int main(int argc, char *argv[]) {
 		std::cout << "Welcome back!\n";
 	}
 
-	std::vector<std::string> command_options{ "exit", "text", "check" };
+	std::vector<std::string> command_options{ "exit", "text", "listen" };
 	while (true) {
 		std::cout << "Awaiting commands: ";
 
 		// Commands:
 		// - exit
 		// - text [username]
-		// - check
+		// - listen
 		// ? history [username]
 
 		std::string command;
@@ -154,7 +156,7 @@ int main(int argc, char *argv[]) {
 				} else {
 					std::cout << "The text command requires 1 argument!\n";
 				}
-			} else if (command_words[0] == "check") {
+			} else if (command_words[0] == "listen") {
 				if (command_words.size() == 1) {
 					int my_sock_fd;
 					char buffer[BUFFER_LEN];
@@ -186,9 +188,22 @@ int main(int argc, char *argv[]) {
                 		(socklen_t *)&len);
 
 					std::string message_to_me = std::string(buffer);
-					std::cout << message_to_me << "\n";
+
+					std::string sender, content;
+					std::string* target = &sender;
+					for (int i = 0; i < message_to_me.length() && message_to_me[i] != '\n'; i++) {
+						if (message_to_me[i] == ':' && target == &sender) {
+							target = &content;
+						} else {
+							*target += message_to_me[i];
+						}
+					}
+
+					std::cout << sender << " texted you: " << content << "\n";
+					
+					close(my_sock_fd);
 				} else {
-					std::cout << "The check command does not require arguments!\n";
+					std::cout << "The listen command does not require arguments!\n";
 				}
 			}
 		} else {
