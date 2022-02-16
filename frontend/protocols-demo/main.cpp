@@ -13,6 +13,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <thread>
+#include <mutex>
+
 #define BUFFER_LEN 1024
 
 // So this is both client and server I guess
@@ -20,6 +23,8 @@
 
 std::string db_name = "txt_file_lol.txt";
 std::string online_db_name = "another_txt_file.txt";
+std::vector<std::pair<std::string, std::string>> message_queue;
+std::mutex mtx;
 
 std::vector<std::string> deconstruct_command(std::string command) {
 	std::vector<std::string> words;
@@ -105,6 +110,55 @@ void text(std::string me, std::string they) {
 	close(udp_sock_fd);
 }
 
+void listen_for_messages(int my_port) {
+	int my_sock_fd;
+	char buffer[BUFFER_LEN];
+	struct sockaddr_in my_addr;
+
+	my_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (my_sock_fd < 0) {
+		std::cout << "Socket creation error!\n";
+	}
+
+	memset(&my_addr, 0, sizeof(my_addr));
+	my_addr.sin_family = AF_INET;
+	my_addr.sin_addr.s_addr = INADDR_ANY;
+	my_addr.sin_port = htons(my_port);
+
+	if (bind(my_sock_fd, (const struct sockaddr *)&my_addr,
+			sizeof(my_addr)) < 0) {
+		std::cout << "Bind error!\n";
+	}
+
+	struct sockaddr_in other_addr;
+	memset(&other_addr, 0, sizeof(other_addr));
+	int len = sizeof(other_addr);
+
+	while (true) {
+		int n = recvfrom(my_sock_fd, (char *)buffer, BUFFER_LEN,
+			MSG_WAITALL, (struct sockaddr *) &other_addr,
+			(socklen_t *)&len);
+
+		std::string message_to_me = std::string(buffer);
+
+		std::string sender, content;
+		std::string* target = &sender;
+		for (int i = 0; i < message_to_me.length() && message_to_me[i] != '\n'; i++) {
+			if (message_to_me[i] == ':' && target == &sender) {
+				target = &content;
+			} else {
+				*target += message_to_me[i];
+			}
+		}
+
+		mtx.lock();
+		message_queue.push_back(std::pair<std::string, std::string>(sender, content));
+		mtx.unlock();
+	}
+	
+	close(my_sock_fd);
+}
+
 int main(int argc, char *argv[]) {
 	if (argc != 2) {
 		std::cout << "Invalid command line arguments!\n";
@@ -128,21 +182,22 @@ int main(int argc, char *argv[]) {
 		std::cout << "Welcome back!\n";
 	}
 
-	std::vector<std::string> command_options{ "exit", "text", "listen" };
+	std::thread listening(listen_for_messages, my_port);
+
+	std::vector<std::string> command_options{ "exit", "text" };
 	while (true) {
 		std::cout << "Awaiting commands: ";
 
 		// Commands:
 		// - exit
 		// - text [username]
-		// - listen
 		// ? history [username]
 
 		std::string command;
 		std::getline(std::cin, command);
 		std::vector<std::string> command_words = deconstruct_command(command);
 
-		if (std::find(command_options.begin(), command_options.end(), command_words[0]) != command_options.end()) {
+		if (command_words.size() != 0 && std::find(command_options.begin(), command_options.end(), command_words[0]) != command_options.end()) {
 			if (command_words[0] == "exit") {
 				if (command_words.size() == 1) {
 					std::cout << "Exiting now!\n";
@@ -156,60 +211,20 @@ int main(int argc, char *argv[]) {
 				} else {
 					std::cout << "The text command requires 1 argument!\n";
 				}
-			} else if (command_words[0] == "listen") {
-				if (command_words.size() == 1) {
-					int my_sock_fd;
-					char buffer[BUFFER_LEN];
-					struct sockaddr_in my_addr;
-
-					my_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-					if (my_sock_fd < 0) {
-						std::cout << "Socket creation error!\n";
-						return -1;
-					}
-
-					memset(&my_addr, 0, sizeof(my_addr));
-					my_addr.sin_family = AF_INET;
-					my_addr.sin_addr.s_addr = INADDR_ANY;
-					my_addr.sin_port = htons(my_port);
-
-					if (bind(my_sock_fd, (const struct sockaddr *)&my_addr,
-							sizeof(my_addr)) < 0) {
-						std::cout << "Bind error!\n";
-						return -1;
-					}
-
-					struct sockaddr_in other_addr;
-					memset(&other_addr, 0, sizeof(other_addr));
-					int len = sizeof(other_addr);
-
-					int n = recvfrom(my_sock_fd, (char *)buffer, BUFFER_LEN, 
-                		MSG_WAITALL, (struct sockaddr *) &other_addr,
-                		(socklen_t *)&len);
-
-					std::string message_to_me = std::string(buffer);
-
-					std::string sender, content;
-					std::string* target = &sender;
-					for (int i = 0; i < message_to_me.length() && message_to_me[i] != '\n'; i++) {
-						if (message_to_me[i] == ':' && target == &sender) {
-							target = &content;
-						} else {
-							*target += message_to_me[i];
-						}
-					}
-
-					std::cout << sender << " texted you: " << content << "\n";
-					
-					close(my_sock_fd);
-				} else {
-					std::cout << "The listen command does not require arguments!\n";
-				}
 			}
+		} else if (command == "") {
+			// do nothing lol, to not flood the console
 		} else {
 			std::cout << "Invalid command!\n";
 		}
 
+		// dump all messages now:
+		mtx.lock();
+		for (int i = 0; i < message_queue.size(); i++) {
+			std::cout << message_queue[i].first << " texted you: " << message_queue[i].second << "\n";
+		}
+		message_queue.clear();
+		mtx.unlock();
 	}
 	return 0;
 }
