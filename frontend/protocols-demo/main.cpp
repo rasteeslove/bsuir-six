@@ -1,11 +1,25 @@
 #include <iostream>
 #include <string>
+#include <string.h>
 #include <vector>
 #include <algorithm>
 #include <sstream>
+#include <fstream>
+
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#define BUFFER_LEN 1024
 
 // So this is both client and server I guess
 // Command line arguments: only one, being the username
+
+std::string db_name = "txt_file_lol.txt";
+std::string online_db_name = "another_txt_file.txt";
 
 std::vector<std::string> deconstruct_command(std::string command) {
 	std::vector<std::string> words;
@@ -20,16 +34,73 @@ std::vector<std::string> deconstruct_command(std::string command) {
 	return words;
 }
 
+// search for username in db and get their port as the 1st el in pair;
+// if not found, return -1 as first, last assigned port number as second;
+std::pair<int, int> get_port(std::string username) {
+	std::ifstream is;
+	is.open(db_name);
+
+	std::string u;
+	int p;
+	while (is >> u >> p) {
+		if (u == username) {
+			is.close();
+			return std::pair<int, int>(p, 0);
+		}
+	}
+
+	is.close();
+	return std::pair<int, int>(-1, p);
+}
+
+// add new user to db: their username and new port;
+int new_user_port(std::string username, int last_assigned) {
+	int new_port = last_assigned + 1;
+
+	std::ofstream os;
+	try {
+		os.open(db_name, std::ios_base::app);
+		os << "\n" << username << " " << new_port;
+	} catch (...) {
+		return -1;
+	}
+
+	os.close();
+	return 0;
+}
+
 void text(std::string me, std::string they) {
-	// checking if they exist ?
-	// making tcp connection ?
-	// if they are not online then return ?
-	// otherwise tell them that you are texting ?
+	int their_port = get_port(they).first;
+
+	// check if they exist:
+	if (their_port == -1) {
+		std::cout << "No user with this username!\n";
+		return;
+	}
 
 	// getting message:
-	std::cout << "Enter the message: ";
+	std::cout << "Enter the message (Press ENTER to finish): ";
+	std::string message;
+	std::getline(std::cin, message);
 
-	// sending w udp ?
+	// making udp connection:
+	int udp_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (udp_sock_fd < 0) {
+		std::cout << "Socket creation error!\n";
+		return;
+	}
+
+	struct sockaddr_in their_addr;
+	memset(&their_addr, 0, sizeof(their_addr));
+	their_addr.sin_family = AF_INET;
+    their_addr.sin_port = htons(their_port);
+    their_addr.sin_addr.s_addr = INADDR_ANY;
+
+	sendto(udp_sock_fd, message.c_str(), strlen(message.c_str()),
+        MSG_CONFIRM, (const struct sockaddr *) &their_addr, 
+            sizeof(their_addr));
+
+	close(udp_sock_fd);
 }
 
 int main(int argc, char *argv[]) {
@@ -40,17 +111,29 @@ int main(int argc, char *argv[]) {
 
 	std::string username(argv[1]);
 
-	// logging in?
-	// adding username to file ?
+	// logging in:
+	std::pair<int, int> port_info = get_port(username);
+	int my_port;
+	if (port_info.first == -1) {
+		my_port = new_user_port(username, port_info.second);
+		if (my_port == -1) {
+			std::cout << "User creation error!\n";
+			return -1;
+		}
+		std::cout << "Welcome!\n";
+	} else {
+		my_port = port_info.first;
+		std::cout << "Welcome back!\n";
+	}
 
-	std::cout << "Welcome!\n";
-	std::vector<std::string> command_options{ "exit", "text" };
+	std::vector<std::string> command_options{ "exit", "text", "check" };
 	while (true) {
 		std::cout << "Awaiting commands: ";
 
 		// Commands:
 		// - exit
 		// - text [username]
+		// - check
 		// ? history [username]
 
 		std::string command;
@@ -71,6 +154,42 @@ int main(int argc, char *argv[]) {
 				} else {
 					std::cout << "The text command requires 1 argument!\n";
 				}
+			} else if (command_words[0] == "check") {
+				if (command_words.size() == 1) {
+					int my_sock_fd;
+					char buffer[BUFFER_LEN];
+					struct sockaddr_in my_addr;
+
+					my_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+					if (my_sock_fd < 0) {
+						std::cout << "Socket creation error!\n";
+						return -1;
+					}
+
+					memset(&my_addr, 0, sizeof(my_addr));
+					my_addr.sin_family = AF_INET;
+					my_addr.sin_addr.s_addr = INADDR_ANY;
+					my_addr.sin_port = htons(my_port);
+
+					if (bind(my_sock_fd, (const struct sockaddr *)&my_addr,
+							sizeof(my_addr)) < 0) {
+						std::cout << "Bind error!\n";
+						return -1;
+					}
+
+					struct sockaddr_in other_addr;
+					memset(&other_addr, 0, sizeof(other_addr));
+					int len = sizeof(other_addr);
+
+					int n = recvfrom(my_sock_fd, (char *)buffer, BUFFER_LEN, 
+                		MSG_WAITALL, (struct sockaddr *) &other_addr,
+                		(socklen_t *)&len);
+
+					std::string message_to_me = std::string(buffer);
+					std::cout << message_to_me << "\n";
+				} else {
+					std::cout << "The check command does not require arguments!\n";
+				}
 			}
 		} else {
 			std::cout << "Invalid command!\n";
@@ -79,4 +198,3 @@ int main(int argc, char *argv[]) {
 	}
 	return 0;
 }
-
