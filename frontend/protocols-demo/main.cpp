@@ -16,16 +16,34 @@
 #include <thread>
 #include <mutex>
 
+#include <chrono>
+#include <ctime>
+
 #define BUFFER_LEN 1024
 
 // So this is both client and server I guess
-// Command line arguments: only one, being the username
+// This is a CLI tool, so command line arguments:
+//     only one, being the username
+
+// username should only use a-z, A-Z, 0-9, _ characters
+
+// Messages to be transmitted using the following universal protocol:
+// "[sender_username]|[receiver_username]|[time_of_departure]|[message_content]\n"
+
+// "[username] [assigned_port]"-pairs to be stored in a text file
+
+// Messages that each user sends and receives to be stored in a file whose name is the user's username
+// Format is the same as for sending
+
+// syncing message histories ???
+// option 1: creating online users db and allowing to text only if the other side is online
 
 std::string db_name = "txt_file_lol.txt";
-std::string online_db_name = "another_txt_file.txt";
-std::vector<std::pair<std::string, std::string>> message_queue;
+
+std::vector<std::vector<std::string>> message_queue;
 std::mutex mtx;
 
+// split a command into words
 std::vector<std::string> deconstruct_command(std::string command) {
 	std::vector<std::string> words;
 	std::cin.clear();
@@ -74,7 +92,9 @@ int new_user_port(std::string username, int last_assigned) {
 	return 0;
 }
 
+// function for texting someone
 void text(std::string me, std::string they) {
+	// search for their port:
 	int their_port = get_port(they).first;
 
 	// check if they exist:
@@ -83,12 +103,17 @@ void text(std::string me, std::string they) {
 		return;
 	}
 
-	// getting message:
+	// getting your message:
 	std::cout << "Enter the message (Press ENTER to finish): ";
 	std::string message;
 	std::getline(std::cin, message);
 
-	message = me + ":" + message + "\n"; // maybe add time
+	// forming message string:
+	auto now = std::chrono::system_clock::now();
+	std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+	std::string time_string = std::string(std::ctime(&now_time));
+	time_string.erase(std::remove(time_string.begin(), time_string.end(), '\n'), time_string.end());
+	message = me + "|" + they + "|" + time_string + "|" + message + "\n";
 
 	// making udp connection:
 	int udp_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -97,6 +122,7 @@ void text(std::string me, std::string they) {
 		return;
 	}
 
+	// filling data:
 	struct sockaddr_in their_addr;
 	memset(&their_addr, 0, sizeof(their_addr));
 	their_addr.sin_family = AF_INET;
@@ -110,30 +136,56 @@ void text(std::string me, std::string they) {
 	close(udp_sock_fd);
 }
 
-void listen_for_messages(int my_port) {
+// parse a message string into sender, receiver, time_string, and content strings
+std::vector<std::string> deconstruct_message(std::string message) {
+	char separator = '|';
+
+	std::string sender, receiver, time_string, content;
+	std::string* target = &sender;
+	for (int i = 0; i < message.length() && message[i] != '\n'; i++) {
+		if (message[i] == separator && target == &sender) {
+			target = &receiver;
+		} else if (message[i] == separator && target == &receiver) {
+			target = &time_string;
+		} else if (message[i] == separator && target == &time_string) {
+			target = &content;
+		} else {
+			*target += message[i];
+		}
+	}
+
+	return std::vector<std::string>({sender, receiver, time_string, content});
+}
+
+// to be running in a separate thread and getting messages for the user
+void listen_for_messages(std::string my_username, int my_port) {
 	int my_sock_fd;
 	char buffer[BUFFER_LEN];
 	struct sockaddr_in my_addr;
 
+	// create my socket
 	my_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (my_sock_fd < 0) {
 		std::cout << "Socket creation error!\n";
 	}
 
+	// fill some data
 	memset(&my_addr, 0, sizeof(my_addr));
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_addr.s_addr = INADDR_ANY;
 	my_addr.sin_port = htons(my_port);
 
-	if (bind(my_sock_fd, (const struct sockaddr *)&my_addr,
-			sizeof(my_addr)) < 0) {
+	// bind or whatever
+	if (bind(my_sock_fd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
 		std::cout << "Bind error!\n";
 	}
 
+	// I don't get the logic but this thing just works
 	struct sockaddr_in other_addr;
 	memset(&other_addr, 0, sizeof(other_addr));
 	int len = sizeof(other_addr);
 
+	// getting message by message
 	while (true) {
 		int n = recvfrom(my_sock_fd, (char *)buffer, BUFFER_LEN,
 			MSG_WAITALL, (struct sockaddr *) &other_addr,
@@ -141,18 +193,16 @@ void listen_for_messages(int my_port) {
 
 		std::string message_to_me = std::string(buffer);
 
-		std::string sender, content;
-		std::string* target = &sender;
-		for (int i = 0; i < message_to_me.length() && message_to_me[i] != '\n'; i++) {
-			if (message_to_me[i] == ':' && target == &sender) {
-				target = &content;
-			} else {
-				*target += message_to_me[i];
-			}
+		std::vector<std::string> message_info = deconstruct_message(message_to_me);
+
+		// small sanity check
+		if (message_info[1] != my_username) {
+			std::cout << "Wow, smth went really wrong!\n";
 		}
 
+		// pushing messages to the user's message queue
 		mtx.lock();
-		message_queue.push_back(std::pair<std::string, std::string>(sender, content));
+		message_queue.push_back(message_info);
 		mtx.unlock();
 	}
 	
@@ -182,7 +232,7 @@ int main(int argc, char *argv[]) {
 		std::cout << "Welcome back!\n";
 	}
 
-	std::thread listening(listen_for_messages, my_port);
+	std::thread listening(listen_for_messages, username, my_port);
 
 	std::vector<std::string> command_options{ "exit", "text" };
 	while (true) {
@@ -212,19 +262,20 @@ int main(int argc, char *argv[]) {
 					std::cout << "The text command requires 1 argument!\n";
 				}
 			}
-		} else if (command == "") {
-			// do nothing lol, to not flood the console
-		} else {
+		} else if (command != "") {
 			std::cout << "Invalid command!\n";
 		}
 
 		// dump all messages now:
-		mtx.lock();
-		for (int i = 0; i < message_queue.size(); i++) {
-			std::cout << message_queue[i].first << " texted you: " << message_queue[i].second << "\n";
+		if (message_queue.size() != 0) {
+			std::cout << "New messages:\n";
+			mtx.lock();
+			for (int i = 0; i < message_queue.size(); i++) {
+				std::cout << "\t" << message_queue[i][0] << " at " << message_queue[i][2] << ": " << message_queue[i][3] << "\n";
+			}
+			message_queue.clear();
+			mtx.unlock();
 		}
-		message_queue.clear();
-		mtx.unlock();
 	}
 	return 0;
 }
