@@ -38,6 +38,9 @@
 // syncing message histories ???
 // option 1: creating online users db and allowing to text only if the other side is online
 
+// note: the first user might need to be created manually (thats what I did), otherwise I suppose the program would crash lol
+//       other option is to rewrite a couple of lines of code
+
 std::string db_name = "txt_file_lol.txt";
 
 std::vector<std::vector<std::string>> message_queue;
