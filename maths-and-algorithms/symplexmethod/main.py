@@ -2,43 +2,52 @@
 Основная фаза симплекс-метода.
 """
 
+import copy
 import numpy as np
 
 
-MAX_ITER = 12
+# the max number of iterations to attempt:
+MAX_ITER = 42
 
 
-def get_basis_and_nonbasis_indexes(x):
-    """
-    This function is also to take c. But with a trick.
-    """
-    B = []
-    nB = []
-    for i, val in enumerate(x):
-        if val == 0:
-            nB.append(i)
-        else:
-            B.append(i)
-    return B, nB
+def list_diff(a, b):
+    return list(set(a) - set(b)) + list(set(b) - set(a))
 
 
-def iteration(A, x, c):
+def iteration(c, A, x, B, Ab_inv_prev):
     """
     Итерация основной фазы симплекс-метода.
-    Return iteration bundle:
-    - unsolvable: True if unsolvable
-    - solved: True if the LPP is solved
+
+    NOTE: the "cAxB" variables are to be modified by reference here.
+
+    INPUT:
+    - c
+    - A
+    - x
+    - B
+    - Ab_inv_prev: матрица обратная матрице Ab из предыдущей итерации
+      (на первой итерации - None)
+
+    OUTPUT: (iteration bundle tuple)
+    - unbound
+    - solved
+    - Ab_inv: матрица обратная Ab с текущей итерации
     """
-    B, nB = get_basis_and_nonbasis_indexes(x)
+    n = len(c)
+
+    B.sort() # this is needed
+    nB = list_diff(B, list(range(n)))
     Ab = np.delete(A, nB, 1)
+
     Ab_inv = np.linalg.inv(Ab) # TODO: use optimul
+
     cb = np.delete(c, nB)
     u = cb @ Ab_inv
     delta = u @ A - c
     nB_delta = [el for i, el in enumerate(delta) if i in nB]
 
     if all([el >= 0 for el in nB_delta]):
-        return False, True
+        return False, True, Ab_inv
 
     j0 = 0
     for i, v in enumerate(nB_delta):
@@ -52,7 +61,7 @@ def iteration(A, x, c):
 
     theta0 = np.amin(theta)
     if theta0 == np.inf:
-        return True, True
+        return True, True, Ab_inv
     theta0_index = np.where(theta == theta0)[0][0] # np.where returns a tuple hence the indexing
 
     j_ast = B[theta0_index]
@@ -68,34 +77,65 @@ def iteration(A, x, c):
         if j != j0:
             x[j] -= theta0*z[j_index]
     
-    return False, False
+    return False, False, Ab_inv
 
 
-def run(c, A, b):
+def run(c, A, x, B):
     """
     The main phase algorithm of the custom 2-phase symplex method.
-    Return main phase bundle:
+    
+    INPUT:
+    - c: np.array: вектор стоимостей из целевой функции
+    - A: 2d np.array: матрица ограничений
+    - x: np.array: начальный базисный допустимый план
+    - B: множество базисных индексов
+
+    OUTPUT: (main phase bundle dict)
     - iter_num: number of iterations made
-    - unsolvable: True is unsolvable
-    - x: the x vector that is the solution, or None
-    - solved: True if the LPP is solved
+    - unbound: True, если целевая функция не ограничена сверху на
+      множестве допустимых планов
+    - solved: True, если решение ЗЛП найдено
+    - x: итоговый допустимый план
+    - B: итоговое множество базисных индексов
     """
-    nB, B = get_basis_and_nonbasis_indexes(c) # there's a little trick
-    
-    # 1: calculate x as x0 (начальный базисный доп план)
-    A_ = np.delete(A, nB, 1)
-    x0 = np.linalg.solve(A_, b).tolist()
-    
-    for i in nB:
-        x0.insert(i, 0)
-    x = np.array(x0)
 
+    # the main phase is run only once or twice for a LPP
+    # hence the copying wouldn't affect the speed much
+    c = copy.deepcopy(c)
+    A = copy.deepcopy(A)
+    x = copy.deepcopy(x)
+    B = copy.deepcopy(B)
+
+    n = len(c)
+    m = len(A)
+
+    # some assertions could be made here for the reliability's sake
+
+    Ab_inv = None
     for i in range(MAX_ITER):
-        unsolvable, solved = iteration(A, x, c)
-        if unsolvable:
-            return i+1, True, None, True
+        unbound, solved, Ab_inv = iteration(c, A, x, B, Ab_inv)
+        if unbound:
+            return {
+                'iter_num': i+1,
+                'unbound': True,
+                'solved': True,
+                'x': x,
+                'B': B,
+            }
         if solved:
-            return i+1, False, x, True
+            return {
+                'iter_num': i+1,
+                'unbound': False,
+                'solved': True,
+                'x': x,
+                'B': B,
+            }
 
-    # the 'I give up' result
-    return i+1, False, x, False
+    # the "I give up" result
+    return {
+        'iter_num': i+1,
+        'unbound': False,
+        'solved': False,
+        'x': x,
+        'B': B,
+    }
