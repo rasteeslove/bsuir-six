@@ -5,16 +5,21 @@
 import copy
 import numpy as np
 
+from symplexmethod import utils
+
 
 # the max number of iterations to attempt:
 MAX_ITER = 42
 
 
 def list_diff(a, b):
+    """
+    Get 2 lists difference (as if they are sets)
+    """
     return list(set(a) - set(b)) + list(set(b) - set(a))
 
 
-def iteration(c, A, x, B, Ab_inv_prev):
+def iteration(c, A, x, B, Ab_inv_prev, index):
     """
     Итерация основной фазы симплекс-метода.
 
@@ -27,27 +32,33 @@ def iteration(c, A, x, B, Ab_inv_prev):
     - B
     - Ab_inv_prev: матрица обратная матрице Ab из предыдущей итерации
       (на первой итерации - None)
+    - index: the index of the element of the B vector that got changed
+      in the previous iteration
 
     OUTPUT: (iteration bundle tuple)
     - unbound
     - solved
     - Ab_inv: матрица обратная Ab с текущей итерации
+    - index: the index of the element of the B vector that got changed
+      in this iteration
     """
     n = len(c)
 
-    B.sort() # this is needed
     nB = list_diff(B, list(range(n)))
-    Ab = np.delete(A, nB, 1)
+    Ab = A[:, B]
 
-    Ab_inv = np.linalg.inv(Ab) # TODO: use optimul
+    if type(Ab_inv_prev) == type(None) and type(index) == type(None):
+        Ab_inv = np.linalg.inv(Ab)
+    else:
+        Ab_inv = utils.smart_invertion(Ab_inv_prev, Ab[:, index], index)
 
-    cb = np.delete(c, nB)
+    cb = [c[i] for i in B]
     u = cb @ Ab_inv
     delta = u @ A - c
     nB_delta = [el for i, el in enumerate(delta) if i in nB]
 
     if all([el >= 0 for el in nB_delta]):
-        return False, True, Ab_inv
+        return False, True, None, None
 
     j0 = 0
     for i, v in enumerate(nB_delta):
@@ -61,7 +72,7 @@ def iteration(c, A, x, B, Ab_inv_prev):
 
     theta0 = np.amin(theta)
     if theta0 == np.inf:
-        return True, True, Ab_inv
+        return True, True, None, None
     theta0_index = np.where(theta == theta0)[0][0] # np.where returns a tuple hence the indexing
 
     j_ast = B[theta0_index]
@@ -77,7 +88,7 @@ def iteration(c, A, x, B, Ab_inv_prev):
         if j != j0:
             x[j] -= theta0*z[j_index]
     
-    return False, False, Ab_inv
+    return False, False, Ab_inv, j_ast_index
 
 
 def run(c, A, x, B):
@@ -112,8 +123,9 @@ def run(c, A, x, B):
     # some assertions could be made here for the reliability's sake
 
     Ab_inv = None
+    index = None
     for i in range(MAX_ITER):
-        unbound, solved, Ab_inv = iteration(c, A, x, B, Ab_inv)
+        unbound, solved, Ab_inv, index = iteration(c, A, x, B, Ab_inv, index)
         if unbound:
             return {
                 'iter_num': i+1,
