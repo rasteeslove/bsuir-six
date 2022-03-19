@@ -13,26 +13,49 @@ from symplexmethod import main
 
 def custom_solve(c, A, b):
     """
-    Input: LPP for which to calculate the optimal plan.
-    Output: оптимальный план задачи, если она не ограничена сверху
-    на множестве допустимых планов, иначе None.
+    Полный алгоритм для симплекс метода.
+
+    INPUT: ЗЛП в канонической форме:
+    - c: вектор стоимостей
+    - A: матрица ограничений
+    - b
+
+    OUTPUT: symplex method bundle dict:
+    - solved: True if the solution is found
+    - inconsistent: True if LPP is found to be inconsistent
+    - unbound: True если обнаружилось, что ц.ф. ЗЛП не ограничена
+      сверху на множестве допустимых планов
+    - x: либо оптимальный план ЗЛП, либо None
+    - details (optional): примечания
     """
     
-    initial_phase_result = initial.run(c, A, b)
+    init_phase_bundle = initial.run(c, A, b)
 
-    # process the initial phase result here smh
+    if not init_phase_bundle['success']:
+        return {
+            'solved': False,
+            'details': 'initial phase failure; '
+            'inner main phase algorithm reached iteration number limit'
+        }
 
-    iter_num, unsolvable, x, solved = main.run(c, A, b)
+    # process the initial phase result:
+    x = init_phase_bundle['x']
+    B = init_phase_bundle['B']
 
-    # process the main phase result here smh
+    main_phase_bundle = main.run(c, A, x, B)
 
-    solution = { 'iter_num': iter_num,
-                 'unsolvable': unsolvable,
-                 'x': x,
-                 'solved': solved
-               }
+    if not main_phase_bundle['solved']:
+        return {
+            'solved': False,
+            'details': 'main phase failure; '
+            'main phase algorithm reached iteration number limit'
+        }
 
-    return solution
+    # process the main phase result:
+    return {
+        'solved': True,
+        'x': main_phase_bundle['x'],
+    }
 
 
 def scipy_solve(c, A, b):
@@ -41,4 +64,3 @@ def scipy_solve(c, A, b):
     Return what scipy returns and let the user handle that themself.
     """
     return linprog(-c, A_eq=A, b_eq=b)
-

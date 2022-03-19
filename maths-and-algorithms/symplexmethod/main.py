@@ -12,13 +12,6 @@ from symplexmethod import utils
 MAX_ITER = 42
 
 
-def list_diff(a, b):
-    """
-    Get 2 lists difference (as if they are sets)
-    """
-    return list(set(a) - set(b)) + list(set(b) - set(a))
-
-
 def iteration(c, A, x, B, Ab_inv_prev, index):
     """
     Итерация основной фазы симплекс-метода.
@@ -44,10 +37,10 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
     """
     n = len(c)
 
-    nB = list_diff(B, list(range(n)))
+    nB = utils.list_diff(B, list(range(n)))
     Ab = A[:, B]
 
-    if type(Ab_inv_prev) == type(None) and type(index) == type(None):
+    if Ab_inv_prev is None and index is None:
         Ab_inv = np.linalg.inv(Ab)
     else:
         Ab_inv = utils.smart_invertion(Ab_inv_prev, Ab[:, index], index)
@@ -79,8 +72,7 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
     j_ast_index = np.where(np.array(B) == j_ast)[0][0]
 
     B[j_ast_index] = j0
-    all_indexes = list(range(len(x)))
-    nB = [item for item in all_indexes if item not in B]
+    nB = utils.list_diff(B, list(range(n)))
     for i in nB:
         x[i] = 0
     x[j0] = theta0

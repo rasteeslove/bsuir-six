@@ -6,6 +6,13 @@ import copy
 import numpy as np
 
 
+def list_diff(a, b):
+    """
+    Get 2 lists difference (as if they are sets)
+    """
+    return list(set(a) - set(b)) + list(set(b) - set(a))
+
+
 def replace_col(A, b, index):
     """
     Replace A matrix column #index by the b vector.
