@@ -16,8 +16,6 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
     """
     Итерация основной фазы симплекс-метода.
 
-    NOTE: the "cAxB" variables are to be modified by reference here.
-
     INPUT:
     - c
     - A
@@ -29,6 +27,8 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
       in the previous iteration
 
     OUTPUT: (iteration bundle tuple)
+    - x
+    - B
     - unbound
     - solved
     - Ab_inv: матрица обратная Ab с текущей итерации
@@ -51,11 +51,11 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
     nB_delta = [el for i, el in enumerate(delta) if i in nB]
 
     if all([el >= 0 for el in nB_delta]):
-        return False, True, None, None
+        return x, B, False, True, None, None
 
     j0 = 0
-    for i, v in enumerate(nB_delta):
-        if v >= 0:
+    for i, v in enumerate(delta):
+        if v < 0:
             j0 = i
             break
 
@@ -65,7 +65,7 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
 
     theta0 = np.amin(theta)
     if theta0 == np.inf:
-        return True, True, None, None
+        return x, B, True, True, None, None
     theta0_index = np.where(theta == theta0)[0][0] # np.where returns a tuple hence the indexing
 
     j_ast = B[theta0_index]
@@ -80,7 +80,7 @@ def iteration(c, A, x, B, Ab_inv_prev, index):
         if j != j0:
             x[j] -= theta0*z[j_index]
     
-    return False, False, Ab_inv, j_ast_index
+    return x, B, False, False, Ab_inv, j_ast_index
 
 
 def run(c, A, x, B):
@@ -117,7 +117,7 @@ def run(c, A, x, B):
     Ab_inv = None
     index = None
     for i in range(MAX_ITER):
-        unbound, solved, Ab_inv, index = iteration(c, A, x, B, Ab_inv, index)
+        x, B, unbound, solved, Ab_inv, index = iteration(c, A, x, B, Ab_inv, index)
         if unbound:
             return {
                 'iter_num': i+1,
