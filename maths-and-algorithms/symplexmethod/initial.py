@@ -58,7 +58,7 @@ def correcting_algorithm(c_wave, A, b, A_wave, B):
             if lj is not None:
                 if lj[k] != 0:
                     found_j = True
-                    jk = j
+                    B[k] = j
                     break
 
         # 2: пусть такого индекса нет:
