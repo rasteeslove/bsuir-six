@@ -90,7 +90,7 @@ def run(c, A, b):
     - success: True if this stage was successful (rn it indicates
       whether the inner main phase algorithm call was successful
       and yielded the solution to вспомогательная ЗЛП)
-    - inconsistent: True if the LPP is found to be inconsistent
+    - infeasible: True if the LPP is found to be infeasible
     - A: new A
     - b: new b
     - x: начальный базисный допустимый план для входной ЗЛП
@@ -128,7 +128,7 @@ def run(c, A, b):
     if any(y[n:]) != 0:
         return {
             'success': True,
-            'inconsistent': True,
+            'infeasible': True,
         }
 
     x_ast = y[:n]
@@ -136,7 +136,7 @@ def run(c, A, b):
 
     return {
         'success': True,
-        'inconsistent': False,
+        'infeasible': False,
         'A': A,
         'b': b,
         'x': x_ast,
