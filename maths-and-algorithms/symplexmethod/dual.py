@@ -77,9 +77,10 @@ def iteration(c, A, b, B, Ab_inv_prev, index):
 
     sigma = {}
     for i in nB:
-        sigma[i] = (c[i] - A[:,i]@y) / mu[i]
+        if mu[i] < 0:
+            sigma[i] = (c[i] - A[:,i]@y) / mu[i]
 
-    sigma0_index = nB[0]
+    sigma0_index = list(sigma.keys())[0]
     for i, s in sigma.items():
         if s < sigma[sigma0_index]:
             sigma0_index = i
