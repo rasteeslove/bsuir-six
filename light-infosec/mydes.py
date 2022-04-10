@@ -75,8 +75,23 @@ def decryptB(source_file_path, target_file_path, keyfile_path):
 
 
 def custom_encrypt(source_file_path, target_file_path, keyfile_path):
-    pass
+    with open(keyfile_path) as f:
+        key = ''.join(f.readlines())
+        key = str.encode(key, 'utf-8')
+
+    with open(source_file_path) as f:
+        plaintext = ''.join(f.readlines())
+        plaintext = str.encode(plaintext)
+
+    # ...
 
 
 def custom_decrypt(source_file_path, target_file_path, keyfile_path):
-    pass
+    with open(keyfile_path) as f:
+        key = ''.join(f.readlines())
+        key = str.encode(key, 'utf-8')
+
+    with open(source_file_path) as f:
+        ciphertext = eval(f.readline())
+
+    # ...
