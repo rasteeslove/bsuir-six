@@ -42,13 +42,12 @@ def correcting_algorithm(c_wave, A, b, A_wave, B):
         # ... то для каждого небазисного индекса j < n вычислить
         # вектор l[j] = A_wave_b_inv @ A_wave_j
         i = jk - n
-        nB = utils.list_diff(B, list(range(n)))
+        nB = [j for j in range(n) if j not in B]
         A_wave_b_inv = np.linalg.inv(A_wave[:, B])
         l = [None]*n
         for j in nB:
-            if j < n:
-                A_wave_j = A_wave[:, j]
-                l[j] = A_wave_b_inv @ A_wave_j
+            A_wave_j = A_wave[:, j]
+            l[j] = A_wave_b_inv @ A_wave_j
 
         # 2 случая:
         # 1: пусть найдется индекс j (небазисный) родной переменной,
