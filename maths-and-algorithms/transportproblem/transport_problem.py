@@ -48,7 +48,7 @@ def nw_corner_method(a, b):
                 X[i][j] = a[i]
                 a[i] = 0
                 i += 1
-        elif a[i] == 0:
+        elif a[i] == 0 and i != n-1:
             i += 1
         else:
             j += 1
