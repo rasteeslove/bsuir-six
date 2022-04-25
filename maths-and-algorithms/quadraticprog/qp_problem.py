@@ -3,6 +3,7 @@ This module contains the means to solve quadratic programming problems.
 """
 
 
+import copy
 from doctest import UnexpectedException
 import numpy as np
 
@@ -31,6 +32,14 @@ def solve(c: np.array, x: np.array, D: np.array,
     - unbounded
     - x
     """
+    c = copy.deepcopy(c)
+    x = copy.deepcopy(x)
+    D = copy.deepcopy(D)
+    A = copy.deepcopy(A)
+    b = copy.deepcopy(b)
+    Jb = copy.deepcopy(Jb)
+    Jb_ast = copy.deepcopy(Jb_ast)
+
     for i in range(MAX_ITER):
         # 1:
         Ab = A[:, Jb]
@@ -53,15 +62,15 @@ def solve(c: np.array, x: np.array, D: np.array,
         # 4:
         l = np.zeros(len(x))
         l[j0] = 1
-        H = np.vstack((np.hstack((D[Jb_ast][:, Jb_ast], A[:, Jb_ast].T)),
-                       np.hstack((A[:, Jb_ast], np.zeros((len(Jb_ast),
-                                                          len(Jb_ast)))))))
+        Hn = np.hstack((D[Jb_ast][:, Jb_ast], A[:, Jb_ast].T))
+        Hs = np.hstack((A[:, Jb_ast], np.zeros((len(A), len(A)))))
+        H = np.vstack((Hn, Hs))
         H_inv = np.linalg.inv(H)
         b_ast = np.hstack((D[Jb_ast][:, j0], A[:, j0]))
 
-        x = -H_inv @ b_ast
-        for i, el in enumerate(Jb_ast):
-            l[el] = x[i]  # needs verification
+        x_impostor = -H_inv @ b_ast
+        for i in range(len(Jb_ast)):
+            l[i] = x_impostor[i]
 
         # 5:
         theta = {}
@@ -70,7 +79,7 @@ def solve(c: np.array, x: np.array, D: np.array,
         for j in Jb_ast:
             theta[j] = -x[j]/l[j] if l[j] < 0 else np.inf
         
-        j_ast = np.argmin(theta)
+        j_ast = min(theta, key=theta.get)
         theta0 = theta[j_ast]
         if theta0 == np.inf:
             return True, True, None
