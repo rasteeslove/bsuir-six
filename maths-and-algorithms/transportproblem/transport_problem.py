@@ -80,10 +80,10 @@ def solve(a: np.array, b: np.array, C: np.array):
 
     diff = np.sum(a) - np.sum(b)
     if diff > 0:
-        b.append(diff)
+        np.append(b, diff)
         C = [[C[i][j] if j < n else 0 for j in range(n+1)] for i in range(m)]
     elif diff < 0:
-        a.append(-diff)
+        np.append(a, -diff)
         C = [C[i] if i < m else np.zeros(n) for i in range(m+1)]
 
     m = len(a)
