@@ -13,8 +13,7 @@ MAX_ITER = 42
 
 
 def solve(c: np.array, x: np.array, D: np.array,
-          A: np.array, b: np.array,
-          Jb: list, Jb_ast: list):
+          A: np.array, Jb: list, Jb_ast: list):
     """
     Решение задачи квадратичного программирования.
 
@@ -23,7 +22,6 @@ def solve(c: np.array, x: np.array, D: np.array,
     - x
     - D
     - A
-    - b
     - Jb
     - Jb_ast
 
@@ -36,7 +34,6 @@ def solve(c: np.array, x: np.array, D: np.array,
     x = copy.deepcopy(x)
     D = copy.deepcopy(D)
     A = copy.deepcopy(A)
-    b = copy.deepcopy(b)
     Jb = copy.deepcopy(Jb)
     Jb_ast = copy.deepcopy(Jb_ast)
 
