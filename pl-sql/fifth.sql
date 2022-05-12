@@ -358,6 +358,7 @@ end restore_data;
 -- ...
 
 -- 4: create a procedure to generate html report containing the changes
---    made since the last html report procedure call or since the
+--    made since the last html report procedure call or since the specified
+--    timestamp
 
 -- ...
